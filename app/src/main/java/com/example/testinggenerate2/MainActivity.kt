@@ -12,6 +12,11 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Environment.getExternalStoragePublicDirectory
 import android.provider.MediaStore
+import com.caverock.androidsvg.SVG
+import com.caverock.androidsvg.SVGParseException
+import com.itextpdf.text.Font
+import com.itextpdf.text.BaseColor
+
 
 import android.util.Log
 import android.widget.Button
@@ -35,7 +40,14 @@ import java.util.*
 import android.Manifest
 import android.app.Activity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
+import com.google.zxing.EncodeHintType
 import com.itextpdf.text.*
+import com.itextpdf.text.pdf.ColumnText
+import com.itextpdf.text.pdf.PdfContentByte
+import com.itextpdf.text.pdf.PdfPageEventHelper
+
+
 
 
 class MainActivity : AppCompatActivity() {
@@ -50,6 +62,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sharepdf: Button
     private lateinit var pdfImage : Button
     private val STORAGE_CODE = 1001
+    private var pdfFileUri: Uri? = null
+
 
     private val createPdfLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -66,6 +80,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
 
         view = findViewById(R.id.card_view)
         ivQRCode = findViewById(R.id.ivQRCode)
@@ -88,26 +103,28 @@ class MainActivity : AppCompatActivity() {
             }else{
                 val writer = QRCodeWriter()
                 try {
-                    val bitMatrix = writer.encode(data, BarcodeFormat.QR_CODE,512, 512)
+                    val hints = Hashtable<EncodeHintType, Any>()
+                    hints[EncodeHintType.MARGIN] = 0 // Set margin ke 0
+                    val bitMatrix = writer.encode(data, BarcodeFormat.QR_CODE, 512, 512, hints)
                     val width = bitMatrix.width
                     val height = bitMatrix.height
                     val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
-                    for (x in 0 until width){
-                        for (y in 0 until height){
+                    for (x in 0 until width) {
+                        for (y in 0 until height) {
                             bmp.setPixel(x, y, if (bitMatrix[x, y]) Color.BLACK else Color.WHITE)
                         }
                     }
                     ivQRCode.setImageBitmap(bmp)
                     val output = etData.text.toString()
                     hasil.text = "$output"
-                }catch (e: WriterException){
+                } catch (e: WriterException) {
                     e.printStackTrace()
                 }
             }
         }
 
         saveImage.setOnClickListener {
-            val bitmap = getImageOfView(view)
+            val bitmap = getImageOfView(ivQRCode)
             if(bitmap!=null){
                 saveimage(bitmap)
             }
@@ -115,8 +132,13 @@ class MainActivity : AppCompatActivity() {
         sharewa.setOnClickListener {
             shareImage()
         }
+        pdfFileUri = createPDFFileUri()
+
         sharepdf.setOnClickListener {
-            shareQRPDF()
+            val uri = createPDFFileUri() // Ganti dengan logika pembuatan URI file PDF
+            if (uri != null) {
+                savePDF(uri)
+            }
         }
         pdfImage.setOnClickListener {
             createPDFFile()
@@ -125,7 +147,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun shareImage() {
         // Mengambil tangkapan layar (screenshot) dari cardView
-        val bitmap = getImageOfView(view)
+        val bitmap = getImageOfView(ivQRCode)
 
         // Menyimpan gambar ke penyimpanan internal menggunakan MediaStore
         val imageUri = saveImageToInternalStorage(bitmap)
@@ -140,23 +162,6 @@ class MainActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
-//    MASIH GAGAL
-    private fun shareQRPDF() {
-        // Mengambil tangkapan layar (screenshot) dari cardView
-        val bitmap = getImageOfView(view)
-
-        // Menyimpan gambar ke penyimpanan internal menggunakan MediaStore
-        val imageUri = saveImageToInternalStorage(bitmap)
-
-        // Membuat intent untuk mengirim gambar ke WhatsApp
-        val intent = Intent(Intent.ACTION_SEND)
-        intent.type = "image/pdf"
-        intent.putExtra(Intent.EXTRA_STREAM, imageUri)
-        intent.setPackage("com.whatsapp")
-
-        // Memulai aktivitas share dengan aplikasi WhatsApp
-        startActivity(intent)
-    }
 
 //
     private fun saveimage(bitmap: Bitmap) {
@@ -187,10 +192,10 @@ class MainActivity : AppCompatActivity() {
     }
 
 //    ngubah card ngebungkus qr code sama text jadi bitmap image
-    private fun getImageOfView(view: CardView): Bitmap {
-        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+    private fun getImageOfView(ivQRCode: ImageView): Bitmap {
+        val bitmap = Bitmap.createBitmap(ivQRCode.width, ivQRCode.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        view.draw(canvas)
+    ivQRCode.draw(canvas)
         return bitmap
     }
 
@@ -220,23 +225,93 @@ class MainActivity : AppCompatActivity() {
     private fun savePDF(uri: Uri) {
         try {
             contentResolver.openOutputStream(uri)?.use { outputStream ->
-                val mDoc = Document(PageSize.A4)
-                PdfWriter.getInstance(mDoc, outputStream)
+                val mDoc = Document(PageSize.A3, 0f, 0f, 100f, 0f) // Mengatur margin menjadi 0
+                val writer = PdfWriter.getInstance(mDoc, outputStream)
+                val footerFont = Font(Font.FontFamily.HELVETICA, 10f, Font.NORMAL, BaseColor.BLACK)
+
+
+                val eventHandler = object : PdfPageEventHelper() {
+                    override fun onEndPage(writer: PdfWriter?, document: Document?) {
+                        val pdfContentByte = writer?.directContent
+
+                        val svgInputStream = resources.openRawResource(R.raw.group_536) // Ganti dengan ID sumber daya SVG Anda
+                        val svg = SVG.getFromInputStream(svgInputStream)
+                        val picture = svg.renderToPicture()
+                        val footerBitmap = Bitmap.createBitmap(picture.width, picture.height, Bitmap.Config.ARGB_8888)
+                        val canvas = Canvas(footerBitmap)
+                        canvas.drawPicture(picture)
+
+                        val outputStream = ByteArrayOutputStream()
+                        footerBitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+                        val footerByteArray = outputStream.toByteArray()
+                        val footerImage = Image.getInstance(footerByteArray)
+
+                        footerImage.scaleToFit(document?.pageSize?.width ?: 0f, footerImage.height.toFloat()) // Gambar akan memenuhi lebar dokumen dan mengikuti tinggi asli gambar
+                        footerImage.setAbsolutePosition(0f, 0f)
+
+                        pdfContentByte?.addImage(footerImage)
+                    }
+                }
+
+                writer.setPageEvent(eventHandler)
+
                 mDoc.open()
 
-                val data = getImageOfView(view)
                 mDoc.addAuthor("Iqbal")
 
+                val qrCodeWidthCm = 25f
+                val qrCodeHeightCm = 25f
 
-                val bitmap: Bitmap? = getImageOfView(view)
+                // Convert cm to points (1 cm = 28.35 points)
+                val qrCodeWidthPoints = qrCodeWidthCm * 28.35f
+                val qrCodeHeightPoints = qrCodeHeightCm * 28.35f
+
+                val bitmap: Bitmap? = getImageOfView(ivQRCode)
+                val scaledBitmap = bitmap?.let { Bitmap.createScaledBitmap(it, qrCodeWidthPoints.toInt(), qrCodeHeightPoints.toInt(), false) }
                 val stream = ByteArrayOutputStream()
-                bitmap?.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                scaledBitmap?.compress(Bitmap.CompressFormat.PNG, 100, stream)
                 val byteArray = stream.toByteArray()
                 val image = Image.getInstance(byteArray)
+                // Menentukan posisi gambar sebagai tengah
+                val documentWidth = mDoc.pageSize.width
+                val documentHeight = mDoc.pageSize.height
+                val imageWidth = image.width.toFloat()
+                val imageHeight = image.height.toFloat()
+                val offsetX = (documentWidth - imageWidth) / 2
+                val offsetY = (documentHeight - imageHeight) / 2 + (documentHeight * 0.2).toFloat() - 70f
+
+                image.setAbsolutePosition(offsetX, offsetY)
 
                 mDoc.add(image)
 
+                val textpdf = etData.text.toString()
+                val textFont = Font(Font.FontFamily.HELVETICA, 30f, Font.BOLD, BaseColor.BLACK)
+
+            // Menghitung lebar dan tinggi teks
+                val textWidth = textFont.getCalculatedBaseFont(true).getWidthPoint(textpdf, textFont.size)
+                val textHeight = textFont.getCalculatedBaseFont(true).getAscentPoint(textpdf, textFont.size) - textFont.getCalculatedBaseFont(true).getDescentPoint(textpdf, textFont.size)
+
+            // Menghitung posisi teks di tengah dokumen
+                val textX = (mDoc.pageSize.width - textWidth) / 2
+                val textY = ivQRCode.bottom + textHeight - 240
+
+            // Mendapatkan PdfContentByte dari writer
+                val canvas = writer.directContent
+
+            // Mulai teks
+                canvas.beginText()
+                canvas.setFontAndSize(textFont.getCalculatedBaseFont(true), textFont.size)
+                canvas.setColorFill(BaseColor.BLACK)
+
+            // Menampilkan teks di bawah gambar
+                canvas.showTextAligned(Element.ALIGN_LEFT, textpdf, textX, textY, 0f)
+
+            // Selesai teks
+                canvas.endText()
+
                 mDoc.close()
+
+                sharePDFViaWhatsApp(pdfFileUri)
 
                 Toast.makeText(this, "PDF Berhasil Dibuat", Toast.LENGTH_SHORT).show()
             }
@@ -245,9 +320,49 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun sharePDFViaWhatsApp(uri: Uri?) {
+
+        val intent = Intent(Intent.ACTION_SEND)
+        intent.type = "application/pdf"
+        intent.putExtra(Intent.EXTRA_STREAM, uri)
+
+        val shareIntent = Intent.createChooser(intent, "Bagikan PDF melalui...")
+        shareIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(createWhatsAppIntent(uri), createBluetoothIntent(uri)))
+
+        startActivity(shareIntent)
+    }
+
+    private fun createWhatsAppIntent(uri: Uri?): Intent {
+        val whatsappIntent = Intent(Intent.ACTION_SEND)
+        whatsappIntent.type = "application/pdf"
+        whatsappIntent.putExtra(Intent.EXTRA_STREAM, uri)
+        whatsappIntent.setPackage("com.whatsapp")
+        return whatsappIntent
+    }
+
+    private fun createBluetoothIntent(uri: Uri?): Intent {
+        val bluetoothIntent = Intent(Intent.ACTION_SEND)
+        bluetoothIntent.type = "application/pdf"
+        bluetoothIntent.putExtra(Intent.EXTRA_STREAM, uri)
+        bluetoothIntent.setPackage("com.android.bluetooth")
+        return bluetoothIntent
+    }
+
+
+
+    private fun createPDFFileUri(): Uri? {
+        val textPDF = etData.text.toString()
+        val pdfFileName = "NAVIKU_$textPDF.pdf" // Ganti dengan nama file PDF yang sesuai
+        val pdfFile = File(getExternalFilesDir(null), pdfFileName)
+        pdfFileUri = FileProvider.getUriForFile(this, "$packageName.fileprovider", pdfFile)
+        return pdfFileUri
+    }
+
+
     private fun generateFileName(): String {
+        val textPDF = etData.text.toString()
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        return "PDF_$timeStamp.pdf"
+        return "NAVIKU_$textPDF.pdf"
     }
 
 
