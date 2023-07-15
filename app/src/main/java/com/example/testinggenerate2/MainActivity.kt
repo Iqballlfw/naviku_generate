@@ -39,6 +39,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import android.Manifest
 import android.app.Activity
+import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.FileProvider
 import com.google.zxing.EncodeHintType
@@ -123,73 +124,73 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        saveImage.setOnClickListener {
-            val bitmap = getImageOfView(ivQRCode)
-            if(bitmap!=null){
-                saveimage(bitmap)
-            }
-        }
-        sharewa.setOnClickListener {
-            shareImage()
-        }
-        pdfFileUri = createPDFFileUri()
+//        saveImage.setOnClickListener {
+//            val bitmap = getImageOfView(ivQRCode)
+//            if(bitmap!=null){
+//                saveimage(bitmap)
+//            }
+//        }
+//        sharewa.setOnClickListener {
+//            shareImage()
+//        }
+//        pdfFileUri = createPDFFileUri()
 
-        sharepdf.setOnClickListener {
-            val uri = createPDFFileUri() // Ganti dengan logika pembuatan URI file PDF
-            if (uri != null) {
-                savePDF(uri)
-            }
-        }
+//        sharepdf.setOnClickListener {
+//            val uri = createPDFFileUri() // Ganti dengan logika pembuatan URI file PDF
+//            if (uri != null) {
+//                savePDF(uri)
+//            }
+//        }
         pdfImage.setOnClickListener {
             createPDFFile()
         }
     }
 
-    private fun shareImage() {
-        // Mengambil tangkapan layar (screenshot) dari cardView
-        val bitmap = getImageOfView(ivQRCode)
-
-        // Menyimpan gambar ke penyimpanan internal menggunakan MediaStore
-        val imageUri = saveImageToInternalStorage(bitmap)
-
-        // Membuat intent untuk mengirim gambar ke WhatsApp
-        val intent = Intent(Intent.ACTION_SEND)
-        intent.type = "image/jpeg"
-        intent.putExtra(Intent.EXTRA_STREAM, imageUri)
-        intent.setPackage("com.whatsapp")
-
-        // Memulai aktivitas share dengan aplikasi WhatsApp
-        startActivity(intent)
-    }
+//    private fun shareImage() {
+//        // Mengambil tangkapan layar (screenshot) dari cardView
+//        val bitmap = getImageOfView(ivQRCode)
+//
+//        // Menyimpan gambar ke penyimpanan internal menggunakan MediaStore
+//        val imageUri = saveImageToInternalStorage(bitmap)
+//
+//        // Membuat intent untuk mengirim gambar ke WhatsApp
+//        val intent = Intent(Intent.ACTION_SEND)
+//        intent.type = "image/jpeg"
+//        intent.putExtra(Intent.EXTRA_STREAM, imageUri)
+//        intent.setPackage("com.whatsapp")
+//
+//        // Memulai aktivitas share dengan aplikasi WhatsApp
+//        startActivity(intent)
+//    }
 
 
 //
-    private fun saveimage(bitmap: Bitmap) {
-        val imageName = "Qrcode${System.currentTimeMillis()}.jpg"
-        var fos : OutputStream? = null
-        if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q){
-            this.contentResolver?.also { resolver->
-                val contentValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME,imageName)
-                    put(MediaStore.MediaColumns.MIME_TYPE,"image/jpg")
-                    put(MediaStore.MediaColumns.RELATIVE_PATH,Environment.DIRECTORY_PICTURES)
-                }
-                val imageUri : Uri? = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,contentValues)
-                fos = imageUri?.let{
-                    resolver.openOutputStream(it)
-                }
-            }
-        }
-        else{
-            val imageDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-            val image = File(imageDirectory,imageName)
-            fos = FileOutputStream(image)
-        }
-        fos.use {
-            bitmap.compress(Bitmap.CompressFormat.JPEG,100,it)
-            Toast.makeText(this, "Berhasil mendownload", Toast.LENGTH_LONG).show()
-        }
-    }
+//    private fun saveimage(bitmap: Bitmap) {
+//        val imageName = "Qrcode${System.currentTimeMillis()}.jpg"
+//        var fos : OutputStream? = null
+//        if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q){
+//            this.contentResolver?.also { resolver->
+//                val contentValues = ContentValues().apply {
+//                    put(MediaStore.MediaColumns.DISPLAY_NAME,imageName)
+//                    put(MediaStore.MediaColumns.MIME_TYPE,"image/jpg")
+//                    put(MediaStore.MediaColumns.RELATIVE_PATH,Environment.DIRECTORY_PICTURES)
+//                }
+//                val imageUri : Uri? = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,contentValues)
+//                fos = imageUri?.let{
+//                    resolver.openOutputStream(it)
+//                }
+//            }
+//        }
+//        else{
+//            val imageDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+//            val image = File(imageDirectory,imageName)
+//            fos = FileOutputStream(image)
+//        }
+//        fos.use {
+//            bitmap.compress(Bitmap.CompressFormat.JPEG,100,it)
+//            Toast.makeText(this, "Berhasil mendownload", Toast.LENGTH_LONG).show()
+//        }
+//    }
 
 //    ngubah card ngebungkus qr code sama text jadi bitmap image
     private fun getImageOfView(ivQRCode: ImageView): Bitmap {
@@ -200,18 +201,18 @@ class MainActivity : AppCompatActivity() {
     }
 
 //    save image sementara untuk share qr codenya
-    private fun saveImageToInternalStorage(bitmap: Bitmap): Uri {
-        // Menyimpan gambar ke penyimpanan internal menggunakan MediaStore
-        val savedImageURL = MediaStore.Images.Media.insertImage(
-            contentResolver,
-            bitmap,
-            "title",
-            "description"
-        )
-
-        // Mengambil URI gambar yang disimpan
-        return Uri.parse(savedImageURL)
-    }
+//    private fun saveImageToInternalStorage(bitmap: Bitmap): Uri {
+//        // Menyimpan gambar ke penyimpanan internal menggunakan MediaStore
+//        val savedImageURL = MediaStore.Images.Media.insertImage(
+//            contentResolver,
+//            bitmap,
+//            "title",
+//            "description"
+//        )
+//
+//        // Mengambil URI gambar yang disimpan
+//        return Uri.parse(savedImageURL)
+//    }
 
     private fun createPDFFile() {
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
@@ -234,7 +235,7 @@ class MainActivity : AppCompatActivity() {
                     override fun onEndPage(writer: PdfWriter?, document: Document?) {
                         val pdfContentByte = writer?.directContent
 
-                        val svgInputStream = resources.openRawResource(R.raw.group_536) // Ganti dengan ID sumber daya SVG Anda
+                        val svgInputStream = resources.openRawResource(R.raw.footer) // Ganti dengan ID sumber daya SVG Anda
                         val svg = SVG.getFromInputStream(svgInputStream)
                         val picture = svg.renderToPicture()
                         val footerBitmap = Bitmap.createBitmap(picture.width, picture.height, Bitmap.Config.ARGB_8888)
@@ -311,7 +312,7 @@ class MainActivity : AppCompatActivity() {
 
                 mDoc.close()
 
-                sharePDFViaWhatsApp(pdfFileUri)
+
 
                 Toast.makeText(this, "PDF Berhasil Dibuat", Toast.LENGTH_SHORT).show()
             }
@@ -319,6 +320,28 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
+
+    fun onShareButtonClick(view: View) {
+        // Panggil fungsi savePDF untuk menyimpan PDF
+        val uri = createPDFFileUri() // Ubah dengan kode yang menghasilkan URI PDF
+        if (uri != null) {
+            savePDF(uri)
+        }
+
+        // Panggil fungsi untuk membagikan PDF
+        if (uri != null) {
+            sharePDFViaWhatsApp(uri)
+        }
+    }
+
+//    private fun sharePDF(uri: Uri) {
+//        val intent = Intent(Intent.ACTION_SEND)
+//        intent.type = "application/pdf"
+//        intent.putExtra(Intent.EXTRA_STREAM, uri)
+//        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+//        startActivity(Intent.createChooser(intent, "Bagikan PDF"))
+//    }
+
 
     private fun sharePDFViaWhatsApp(uri: Uri?) {
 
